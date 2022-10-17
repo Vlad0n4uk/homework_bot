@@ -94,7 +94,6 @@ def check_response(response):
     Возвращает список домашних работ при корректном ответе API."""
     if not isinstance(response, dict):
         raise TypeError('Неверный тип данных. Ожидается словарь.')
-
     homeworks = response.get('homeworks')
     if homeworks is None:
         logger.error('Отсутствие ожидаемых ключей в ответе API.')
@@ -133,16 +132,22 @@ def main():
             response = get_api_answer(current_timestamp)
             homework = check_response(response)
             if homework['status'] != status:
-
+                message = parse_status(homework)
+                send_message(bot, message)
+            logger.info('Статус не поменялся')
             time.sleep(RETRY_TIME)
-
         except Exception as error:
             logger.critical(error)
             message = f'Сбой в работе программы: {error}'
-            
+            send_message(bot, message)
             time.sleep(RETRY_TIME)
         else:
-            ...
+            new_response = get_api_answer(current_timestamp)
+            new_homework = check_response(new_response)
+            if new_homework['status'] != homework['status']:
+                message = parse_status(new_homework)
+                send_message(bot, message)
+            logger.info('Статус не поменялся')
 
 
 if __name__ == '__main__':
