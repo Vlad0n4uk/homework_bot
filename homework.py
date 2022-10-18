@@ -45,14 +45,14 @@ logger.addHandler(
 
 
 def check_tokens():
-    "Функция проверяет доступность переменных окружения."
+    """Функция проверяет доступность переменных окружения."""
     if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
         return True
     logger.critical('Отсутствует обязательная переменная окружения')
 
 
 def send_message(bot, message):
-    "Функция отправки сообщения."
+    """Функция отправки сообщения."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, text=message)
         logger.info('Сообщение отправлено')
@@ -62,7 +62,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    "Функция делает запрос к API Практикум.Домашка."
+    """Функция делает запрос к API Практикум.Домашка."""
     timestamp = current_timestamp
     params = {'from_date': timestamp}
     try:
@@ -95,7 +95,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    "Функция определяет статус работы отправленной на код-ревью."
+    """Функция определяет статус работы отправленной на код-ревью."""
     if 'homework_name' not in homework:
         logger.error('Отсутствие ожидаемых ключей в ответе API')
         raise KeyError("Отсутствует ключ 'homework_name' в ответе API")
@@ -112,7 +112,7 @@ def parse_status(homework):
 
 
 def main():
-    "Функция запуска Телеграм-бота."
+    """Функция запуска Телеграм-бота."""
     if not check_tokens():
         exit()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
