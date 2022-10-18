@@ -10,6 +10,8 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
+from exceptions import RequestExceptionError, ResponseException
+
 load_dotenv()
 
 
@@ -43,16 +45,6 @@ logger.addHandler(
 )
 
 
-class ResponseException(Exception):
-    "Ответ сервера не равен 200"
-    pass
-
-
-class RequestExceptionError(Exception):
-    """Ошибка запроса."""
-    pass
-
-
 def check_tokens():
     """Функция проверяет доступность переменных окружения."""
     if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
@@ -73,7 +65,7 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Функция делает запрос к API Практикум.Домашка"""
-    timestamp = current_timestamp or int(time.time())
+    timestamp = current_timestamp
     params = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
@@ -94,7 +86,7 @@ def check_response(response):
     Возвращает список домашних работ при корректном ответе API."""
     if not isinstance(response, dict):
         raise TypeError('Неверный тип данных. Ожидается словарь.')
-    homeworks = response.get('homeworks')
+    homeworks = response['homeworks']
     if homeworks is None:
         logger.error('Отсутствие ожидаемых ключей в ответе API.')
         raise KeyError('Неверный ключ.')
@@ -108,11 +100,11 @@ def parse_status(homework):
     if 'homework_name' not in homework:
         logger.error('Отсутствие ожидаемых ключей в ответе API')
         raise KeyError("Отсутствует ключ 'homework_name' в ответе API")
-    homework_name = homework.get('homework_name')
+    homework_name = homework['homework_name']
     if 'status' not in homework:
         logger.error('Отсутствие ожидаемых ключей в ответе API')
         raise KeyError("Отсутствует ключ 'status' в ответе API")
-    homework_status = homework.get('status')
+    homework_status = homework['status']
     if homework_status not in HOMEWORK_STATUSES:
         logger.error('Отсутствие ожидаемого статуса проверки работы')
         raise KeyError(f'Отсутствует ключ {homework_status} в статусах работы')
@@ -131,23 +123,19 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             homework = check_response(response)
-            if homework['status'] != status:
-                message = parse_status(homework)
+            if homework:
+                message = parse_status(homework[0])
                 send_message(bot, message)
-            logger.info('Статус не поменялся')
-            time.sleep(RETRY_TIME)
+            else:
+                logger.debug('Отсутствие в ответе новых статусов')
         except Exception as error:
-            logger.critical(error)
             message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
-            time.sleep(RETRY_TIME)
-        else:
-            new_response = get_api_answer(current_timestamp)
-            new_homework = check_response(new_response)
-            if new_homework['status'] != homework['status']:
-                message = parse_status(new_homework)
+            logger.error(message)
+            if message != status:
+                status = message
                 send_message(bot, message)
-            logger.info('Статус не поменялся')
+        finally:
+            time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
