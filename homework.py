@@ -1,5 +1,4 @@
-"""Создаем Телеграм-бота, способного оповещать пользователя
-при получении результатов проверки код-ревью."""
+"""Телеграм-бот, проверяющий статус код-ревью."""
 
 import json
 import logging
@@ -53,10 +52,7 @@ def check_tokens():
 
 
 def send_message(bot, message):
-    """"
-    Функция отправки сообщения с уведомолением
-    об изменении статуса код-ревью.
-    """
+    """"Функция отправки сообщения."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, text=message)
         logger.info('Сообщение отправлено')
@@ -66,7 +62,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    """Функция делает запрос к API Практикум.Домашка"""
+    """Функция делает запрос к API Практикум.Домашка."""
     timestamp = current_timestamp
     params = {'from_date': timestamp}
     try:
@@ -85,7 +81,8 @@ def get_api_answer(current_timestamp):
 
 def check_response(response):
     """Функция проверяет ответ от API на корректность.
-    Возвращает список домашних работ при корректном ответе API."""
+    Возвращает список домашних работ при корректном ответе API.
+    """
     if not isinstance(response, dict):
         raise TypeError('Неверный тип данных. Ожидается словарь.')
     homeworks = response['homeworks']
