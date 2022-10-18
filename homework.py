@@ -1,8 +1,5 @@
-
-"""
-Создаем Телеграм-бота, способного оповещать пользователя
-при получении результатов проверки код-ревью
-"""
+"""Создаем Телеграм-бота, способного оповещать пользователя
+при получении результатов проверки код-ревью."""
 
 import json
 import logging
@@ -80,17 +77,15 @@ def get_api_answer(current_timestamp):
         return response.json()
     except requests.exceptions.RequestException as request_error:
         logger.error(f'Код ответа API : {request_error}')
-        raise RequestExceptionError('Некорректный запрос')
+        raise RequestExceptionError('Некорректный запрос ')
     except json.JSONDecodeError as value_error:
         logger.error(f'Код ответа API : {value_error}')
         raise json.JSONDecodeError('Некорректные данные')
 
 
 def check_response(response):
-    """
-    Функция проверяет ответ от API на корректность.
-    Возвращает список домашних работ при корректном ответе API.
-    """
+    """Функция проверяет ответ от API на корректность.
+    Возвращает список домашних работ при корректном ответе API."""
     if not isinstance(response, dict):
         raise TypeError('Неверный тип данных. Ожидается словарь.')
     homeworks = response['homeworks']
