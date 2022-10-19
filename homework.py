@@ -57,7 +57,9 @@ def check_tokens():
     for name in ALL_TOKEN_NAMES:
         if globals()[name]:
             return True
-        logger.critical(
+        logging.critical(  # Почему тут не проходит pytest через logger... ?
+                           # выводит вот такую ощибку:
+                           # NameError: name 'logger' is not defined
             CHECK_TOKENS_CRITICAL_LOG.format(name)
         )
         return False
