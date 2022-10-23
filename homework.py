@@ -2,6 +2,7 @@
 
 import logging
 import os
+import sys
 import time
 
 import requests
@@ -84,25 +85,23 @@ def get_api_answer(current_timestamp):
             GET_API_ANSWER_REQUEST_ERROR.format(
                 f'{request_error}, {ENDPOINT},{HEADERS}, {params}')
         )
+    description = ''
+    response = response.json()
+    errors = ['code', 'error']
+    for error in errors:
+        if error in response:
+            description += f"{error}: {response[error]}. "
     if response.status_code != 200:
-        description = ''
-        try:
-            response = response.json()
-            if 'code' in response:
-                description += f"code: {response['code']}. "
-            if 'error' in response:
-                description += f"error: {response['error']}"
-        finally:
-            raise ResponseException(
-                GET_API_ANSWER_RESPONSE_ERROR.format(
-                    f'{response.status_code} ',
-                    f'{ENDPOINT} ',
-                    f'{HEADERS} ',
-                    f'{params}',
-                    f'{description}'
-                )
+        raise ResponseException(
+            GET_API_ANSWER_RESPONSE_ERROR.format(
+                f'{response.status_code} ',
+                f'{ENDPOINT} ',
+                f'{HEADERS} ',
+                f'{params}',
+                f'{description}'
             )
-    return response.json()
+        )
+    return response
 
 
 def check_response(response):
@@ -113,10 +112,10 @@ def check_response(response):
         raise TypeError(TYPE_ERROR_DICT.format(type(response)))
     if 'homeworks' not in response:
         raise KeyError(KEY_ERROR)
-    data = response['homeworks']
-    if not isinstance(data, list):
-        raise TypeError(TYPE_ERROR_LIST.format(type(data)))
-    return data
+    homeworks = response['homeworks']
+    if not isinstance(homeworks, list):
+        raise TypeError(TYPE_ERROR_LIST.format(type(homeworks)))
+    return homeworks
 
 
 def parse_status(homework):
@@ -134,20 +133,28 @@ def main():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time()) - 100000
+    last_message = ''
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            response.get('current_date', current_timestamp)
-            data = check_response(response)
-            if data:
-                message = parse_status(data[0])
+            current_timestamp = response.get('current_date', current_timestamp)
+            homeworks = check_response(response)
+            if homeworks:
+                message = parse_status(homeworks[0])
                 send_message(bot, message)
             else:
                 logging.debug(NO_NEW_STATUS_IN_API)
         except Exception as error:
             message = MAIN_EXCEPTION_MESSAGE.format(error)
             logging.error(message)
-            send_message(bot, message)
+            if message != last_message:
+                try:
+                    send_message(bot, message)
+                except Exception as error:
+                    logging.error(f'{error}')
+                last_message = message
+            else:
+                logging.debug(NO_NEW_STATUS_IN_API)
         finally:
             time.sleep(RETRY_TIME)
 
@@ -165,5 +172,5 @@ if __name__ == '__main__':
         filemode='w',
         format=LOG_ATTRIBUTES
     )
-    logging.StreamHandler()
+    logging.StreamHandler(sys.stdout).setFormatter(LOG_ATTRIBUTES)
     main()
