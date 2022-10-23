@@ -40,10 +40,12 @@ GET_API_ANSWER_REQUEST_ERROR = (
 )
 GET_API_ANSWER_RESPONSE_ERROR = (
     'Ответ сервера = {}. '
-    'Входящие параметры: {}, {}, {}'
+    'Входящие параметры: {}, {}, {}. '
+    '{}'
 )
-TYPE_ERROR = 'Неверный тип данных: {}. Ожидается {}.'
-KEY_ERROR = 'Невозможно получить значение по ключу: {}.'
+TYPE_ERROR_LIST = 'Неверный тип данных: {}. Ожидается список.'
+TYPE_ERROR_DICT = 'Неверный тип данных: {}. Ожидается словарь.'
+KEY_ERROR = 'Невозможно получить значение по ключу: homeworks.'
 PARSE_STATUS_RETURN_PHRASE = (
     'Изменился статус проверки работы "{}". '
     '{}'
@@ -55,45 +57,51 @@ NO_NEW_STATUS_IN_API = 'Отсутствие в ответе новых стат
 def check_tokens():
     """Функция проверяет доступность переменных окружения."""
     for name in ALL_TOKEN_NAMES:
-        if globals()[name]:
-            return True
-        logging.critical(  # Почему тут не проходит pytest через logger... ?
-                           # выводит вот такую ощибку:
-                           # NameError: name 'logger' is not defined
-            CHECK_TOKENS_CRITICAL_LOG.format(name)
-        )
-        return False
+        if not globals()[name]:
+            logging.critical(CHECK_TOKENS_CRITICAL_LOG.format(name))
+            return False
+    return True
 
 
 def send_message(bot, message):
     """Функция отправки сообщения."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, text=message)
-        logger.info(SEND_MESSAGE_INFO_LOG.format(message))
+        logging.info(SEND_MESSAGE_INFO_LOG.format(message))
     except telegram.TelegramError as telegram_error:
-        logger.exception(SEND_MESSAGE_EXCEPTION_LOG(message, telegram_error))
+        logging.exception(SEND_MESSAGE_EXCEPTION_LOG(message, telegram_error))
 
 
 def get_api_answer(current_timestamp):
     """Функция делает запрос к API Практикум.Домашка."""
+    params = {'from_date': current_timestamp}
     try:
         response = requests.get(
-            ENDPOINT, headers=HEADERS, params={'from_date': current_timestamp}
+            ENDPOINT, headers=HEADERS, params=params
         )
     except requests.exceptions.RequestException as request_error:
-        raise ValueError(
+        raise ConnectionError(
             GET_API_ANSWER_REQUEST_ERROR.format(
-                f'{request_error}, {ENDPOINT},{HEADERS}, {current_timestamp}')
+                f'{request_error}, {ENDPOINT},{HEADERS}, {params}')
         )
     if response.status_code != 200:
-        raise ResponseException(
-            GET_API_ANSWER_RESPONSE_ERROR.format(
-                f'{response.status_code} ',
-                f'{ENDPOINT} ',
-                f'{HEADERS} ',
-                f'{current_timestamp}'
+        description = ''
+        try:
+            response = response.json()
+            if 'code' in response:
+                description += f"code: {response['code']}. "
+            if 'error' in response:
+                description += f"error: {response['error']}"
+        finally:
+            raise ResponseException(
+                GET_API_ANSWER_RESPONSE_ERROR.format(
+                    f'{response.status_code} ',
+                    f'{ENDPOINT} ',
+                    f'{HEADERS} ',
+                    f'{params}',
+                    f'{description}'
+                )
             )
-        )
     return response.json()
 
 
@@ -102,12 +110,12 @@ def check_response(response):
     Возвращает список домашних работ при корректном ответе API.
     """
     if not isinstance(response, dict):
-        raise TypeError(TYPE_ERROR.format(type(response), dict))
-    data = response['homeworks']
+        raise TypeError(TYPE_ERROR_DICT.format(type(response)))
     if 'homeworks' not in response:
-        raise ValueError(KEY_ERROR.format(data))
+        raise KeyError(KEY_ERROR)
+    data = response['homeworks']
     if not isinstance(data, list):
-        raise TypeError(TYPE_ERROR.format(type(data), list))
+        raise TypeError(TYPE_ERROR_LIST.format(type(data)))
     return data
 
 
@@ -117,34 +125,29 @@ def parse_status(homework):
     status = homework['status']
     if status not in HOMEWORK_VERDICTS:
         raise ValueError(KEY_ERROR.format(status))
-    return (PARSE_STATUS_RETURN_PHRASE.format(name, HOMEWORK_VERDICTS[status]))
+    return PARSE_STATUS_RETURN_PHRASE.format(name, HOMEWORK_VERDICTS[status])
 
 
 def main():
     """Функция запуска Телеграм-бота."""
     if not check_tokens():
-        main.exit()
+        return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time()) - 100000
-    status = ''
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            current_timestamp = response.get('current_date')
+            response.get('current_date', current_timestamp)
             data = check_response(response)
             if data:
                 message = parse_status(data[0])
                 send_message(bot, message)
             else:
-                logger.debug(NO_NEW_STATUS_IN_API)
+                logging.debug(NO_NEW_STATUS_IN_API)
         except Exception as error:
             message = MAIN_EXCEPTION_MESSAGE.format(error)
-            logger.error(message)
+            logging.error(message)
             send_message(bot, message)
-        else:
-            if message != status:
-                status = message
-                send_message(bot, message)
         finally:
             time.sleep(RETRY_TIME)
 
@@ -162,8 +165,5 @@ if __name__ == '__main__':
         filemode='w',
         format=LOG_ATTRIBUTES
     )
-    logger = logging.getLogger(__name__)
-    logger.addHandler(
-        logging.StreamHandler()
-    )
+    logging.StreamHandler()
     main()
