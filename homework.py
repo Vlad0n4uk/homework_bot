@@ -86,11 +86,20 @@ def get_api_answer(current_timestamp):
                 f'{request_error}, {ENDPOINT},{HEADERS}, {params}')
         )
     description = ''
-    response = response.json()
+    response_json = response.json()
     errors = ['code', 'error']
     for error in errors:
-        if error in response:
-            description += f"{error}: {response[error]}. "
+        if error in response_json:
+            description += f"{error}: {response_json[error]}. "
+            raise ResponseException(
+                GET_API_ANSWER_RESPONSE_ERROR.format(
+                    f'{response.status_code} ',
+                    f'{ENDPOINT} ',
+                    f'{HEADERS} ',
+                    f'{params}',
+                    f'{description}'
+                )
+            )
     if response.status_code != 200:
         raise ResponseException(
             GET_API_ANSWER_RESPONSE_ERROR.format(
@@ -98,10 +107,9 @@ def get_api_answer(current_timestamp):
                 f'{ENDPOINT} ',
                 f'{HEADERS} ',
                 f'{params}',
-                f'{description}'
             )
         )
-    return response
+    return response_json
 
 
 def check_response(response):
