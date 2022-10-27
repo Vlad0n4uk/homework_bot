@@ -9,7 +9,7 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-from exceptions import ResponseException
+from exceptions import ResponseException, ServiceDenial
 
 load_dotenv()
 
@@ -42,6 +42,10 @@ GET_API_ANSWER_REQUEST_ERROR = (
 GET_API_ANSWER_RESPONSE_ERROR = (
     'Ответ сервера = {}. '
     'Входящие параметры: {}, {}, {}. '
+)
+SERVICE_DENIAL_ERROR = (
+    'Ответ сервера = {}. '
+    'Входящие параметры: {}, {}, {}. '
     '{}'
 )
 TYPE_ERROR_LIST = 'Неверный тип данных: {}. Ожидается список.'
@@ -58,10 +62,11 @@ NO_NEW_STATUS_IN_API = 'Отсутствие в ответе новых стат
 def check_tokens():
     """Функция проверяет доступность переменных окружения."""
     for name in ALL_TOKEN_NAMES:
+        are_tokens_valid = True
         if not globals()[name]:
+            are_tokens_valid = False
             logging.critical(CHECK_TOKENS_CRITICAL_LOG.format(name))
-            return False
-    return True
+    return are_tokens_valid
 
 
 def send_message(bot, message):
@@ -91,8 +96,8 @@ def get_api_answer(current_timestamp):
     for error in errors:
         if error in response_json:
             description += f"{error}: {response_json[error]}. "
-            raise ResponseException(
-                GET_API_ANSWER_RESPONSE_ERROR.format(
+            raise ServiceDenial(
+                SERVICE_DENIAL_ERROR.format(
                     f'{response.status_code} ',
                     f'{ENDPOINT} ',
                     f'{HEADERS} ',
