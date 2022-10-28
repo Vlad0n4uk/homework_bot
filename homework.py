@@ -44,9 +44,8 @@ GET_API_ANSWER_RESPONSE_ERROR = (
     'Входящие параметры: {}, {}, {}. '
 )
 SERVICE_DENIAL_ERROR = (
-    'Ответ сервера = {}. '
-    'Входящие параметры: {}, {}, {}. '
-    '{}'
+    'Найден ключ {}. Описание: {}. '
+    'Входящие параметры: {}, {}, {}.'
 )
 TYPE_ERROR_LIST = 'Неверный тип данных: {}. Ожидается список.'
 TYPE_ERROR_DICT = 'Неверный тип данных: {}. Ожидается словарь.'
@@ -61,8 +60,8 @@ NO_NEW_STATUS_IN_API = 'Отсутствие в ответе новых стат
 
 def check_tokens():
     """Функция проверяет доступность переменных окружения."""
+    are_tokens_valid = True
     for name in ALL_TOKEN_NAMES:
-        are_tokens_valid = True
         if not globals()[name]:
             are_tokens_valid = False
             logging.critical(CHECK_TOKENS_CRITICAL_LOG.format(name))
@@ -81,37 +80,25 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Функция делает запрос к API Практикум.Домашка."""
     params = {'from_date': current_timestamp}
+    data = dict(url=ENDPOINT, headers=HEADERS, params=params)
     try:
-        response = requests.get(
-            ENDPOINT, headers=HEADERS, params=params
-        )
+        response = requests.get(**data)
     except requests.exceptions.RequestException as request_error:
         raise ConnectionError(
-            GET_API_ANSWER_REQUEST_ERROR.format(
-                f'{request_error}, {ENDPOINT},{HEADERS}, {params}')
+            GET_API_ANSWER_REQUEST_ERROR.format(f'{request_error} ', **data)
         )
-    description = ''
     response_json = response.json()
-    errors = ['code', 'error']
-    for error in errors:
+    for error in ['code', 'error']:
         if error in response_json:
-            description += f"{error}: {response_json[error]}. "
             raise ServiceDenial(
                 SERVICE_DENIAL_ERROR.format(
-                    f'{response.status_code} ',
-                    f'{ENDPOINT} ',
-                    f'{HEADERS} ',
-                    f'{params}',
-                    f'{description}'
+                    f'{error}, {response_json[error]}', **data
                 )
             )
     if response.status_code != 200:
         raise ResponseException(
             GET_API_ANSWER_RESPONSE_ERROR.format(
-                f'{response.status_code} ',
-                f'{ENDPOINT} ',
-                f'{HEADERS} ',
-                f'{params}',
+                f'{response.status_code} ', **data
             )
         )
     return response_json
@@ -150,11 +137,12 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            current_timestamp = response.get('current_date', current_timestamp)
             homeworks = check_response(response)
             if homeworks:
                 message = parse_status(homeworks[0])
                 send_message(bot, message)
+                current_timestamp = response.get(
+                    'current_date', current_timestamp)
             else:
                 logging.debug(NO_NEW_STATUS_IN_API)
         except Exception as error:
@@ -163,11 +151,9 @@ def main():
             if message != last_message:
                 try:
                     send_message(bot, message)
+                    last_message = message
                 except Exception as error:
                     logging.error(f'{error}')
-                last_message = message
-            else:
-                logging.debug(NO_NEW_STATUS_IN_API)
         finally:
             time.sleep(RETRY_TIME)
 
@@ -181,9 +167,10 @@ if __name__ == '__main__':
                       '%(lineno)d')
     logging.basicConfig(  # Глобальная настройка логов
         level=logging.DEBUG,
-        filename=__file__ + '.log',  # Запись логов в файл
-        filemode='w',
+        handlers=[
+            logging.FileHandler(__file__ + '.log', mode='w'),
+            logging.StreamHandler(sys.stdout)
+        ],
         format=LOG_ATTRIBUTES
     )
-    logging.StreamHandler(sys.stdout).setFormatter(LOG_ATTRIBUTES)
     main()
