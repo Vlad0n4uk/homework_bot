@@ -44,7 +44,7 @@ GET_API_ANSWER_RESPONSE_ERROR = (
     'Входящие параметры: {url}, {headers}, {params}. '
 )
 SERVICE_DENIAL_ERROR = (
-    'Отказ в обслуживании: {}. '
+    'Отказ в обслуживании:{}: {}. '
     'Входящие параметры: {url}, {headers}, {params}.'
 )
 TYPE_ERROR_LIST = 'Неверный тип данных: {}. Ожидается список.'
@@ -92,7 +92,8 @@ def get_api_answer(current_timestamp):
     for error in ['code', 'error']:
         if error in response_json:
             raise ServiceDenial(
-                SERVICE_DENIAL_ERROR.format(response_json[error], **data)
+                SERVICE_DENIAL_ERROR.format(
+                    error, response_json[error], **data)
             )
     if response.status_code != 200:
         raise ResponseException(
@@ -140,15 +141,15 @@ def main():
                 send_message(bot, message)
             else:
                 logging.debug(NO_NEW_STATUS_IN_API)
+            current_timestamp = response.get(
+                'current_date', current_timestamp)
         except Exception as error:
             message = MAIN_EXCEPTION_MESSAGE.format(error)
             logging.error(message)
             if message != last_message:
                 send_message(bot, message)
-        finally:
             last_message = message
-            current_timestamp = response.get(
-                'current_date', current_timestamp)
+        finally:
             time.sleep(RETRY_TIME)
 
 
