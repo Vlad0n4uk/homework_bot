@@ -56,6 +56,7 @@ PARSE_STATUS_RETURN_PHRASE = (
 )
 MAIN_EXCEPTION_MESSAGE = 'Сбой в работе программы: {}'
 NO_NEW_STATUS_IN_API = 'Отсутствие в ответе новых статусов'
+MAIN_EXCEPTION_ERROR = 'Ошибка: {}'
 
 
 def check_tokens():
@@ -153,7 +154,7 @@ def main():
                     send_message(bot, message)
                     last_message = message
                 except Exception as error:
-                    logging.error(f'{error}')
+                    logging.error(MAIN_EXCEPTION_ERROR.format(error))
         finally:
             time.sleep(RETRY_TIME)
 
