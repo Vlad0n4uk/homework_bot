@@ -37,20 +37,20 @@ SEND_MESSAGE_INFO_LOG = ('Сообщение отправлено: {}')
 SEND_MESSAGE_EXCEPTION_LOG = ('Сообщение {} в Telegram не отправлено: {}')
 GET_API_ANSWER_REQUEST_ERROR = (
     'Некорректный запрос: {}. '
-    'Передаваемые параметры:{}, {}, {}'
+    'Передаваемые параметры:{url}, {headers}, {params}'
 )
 GET_API_ANSWER_RESPONSE_ERROR = (
     'Ответ сервера = {}. '
-    'Входящие параметры: {}, {}, {}. '
+    'Входящие параметры: {url}, {headers}, {params}. '
 )
 SERVICE_DENIAL_ERROR = (
-    'Найден ключ {}. Описание: {}. '
-    'Входящие параметры: {}, {}, {}.'
+    'Отказ в обслуживании: {}. '
+    'Входящие параметры: {url}, {headers}, {params}.'
 )
 TYPE_ERROR_LIST = 'Неверный тип данных: {}. Ожидается список.'
 TYPE_ERROR_DICT = 'Неверный тип данных: {}. Ожидается словарь.'
 KEY_ERROR = 'Невозможно получить значение по ключу: homeworks.'
-PARSE_STATUS_RETURN_PHRASE = (
+PARSE_STATUS_RETURN = (
     'Изменился статус проверки работы "{}". '
     '{}'
 )
@@ -86,21 +86,17 @@ def get_api_answer(current_timestamp):
         response = requests.get(**data)
     except requests.exceptions.RequestException as request_error:
         raise ConnectionError(
-            GET_API_ANSWER_REQUEST_ERROR.format(f'{request_error} ', **data)
+            GET_API_ANSWER_REQUEST_ERROR.format(request_error, **data)
         )
     response_json = response.json()
     for error in ['code', 'error']:
         if error in response_json:
             raise ServiceDenial(
-                SERVICE_DENIAL_ERROR.format(
-                    f'{error}, {response_json[error]}', **data
-                )
+                SERVICE_DENIAL_ERROR.format(response_json[error], **data)
             )
     if response.status_code != 200:
         raise ResponseException(
-            GET_API_ANSWER_RESPONSE_ERROR.format(
-                f'{response.status_code} ', **data
-            )
+            GET_API_ANSWER_RESPONSE_ERROR.format(response.status_code, **data)
         )
     return response_json
 
@@ -125,7 +121,7 @@ def parse_status(homework):
     status = homework['status']
     if status not in HOMEWORK_VERDICTS:
         raise ValueError(KEY_ERROR.format(status))
-    return PARSE_STATUS_RETURN_PHRASE.format(name, HOMEWORK_VERDICTS[status])
+    return PARSE_STATUS_RETURN.format(name, HOMEWORK_VERDICTS[status])
 
 
 def main():
@@ -142,20 +138,17 @@ def main():
             if homeworks:
                 message = parse_status(homeworks[0])
                 send_message(bot, message)
-                current_timestamp = response.get(
-                    'current_date', current_timestamp)
             else:
                 logging.debug(NO_NEW_STATUS_IN_API)
         except Exception as error:
             message = MAIN_EXCEPTION_MESSAGE.format(error)
             logging.error(message)
             if message != last_message:
-                try:
-                    send_message(bot, message)
-                    last_message = message
-                except Exception as error:
-                    logging.error(MAIN_EXCEPTION_ERROR.format(error))
+                send_message(bot, message)
         finally:
+            last_message = message
+            current_timestamp = response.get(
+                'current_date', current_timestamp)
             time.sleep(RETRY_TIME)
 
 
