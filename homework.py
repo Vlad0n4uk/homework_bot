@@ -71,11 +71,14 @@ def check_tokens():
 
 def send_message(bot, message):
     """Функция отправки сообщения."""
+    success = True
     try:
         bot.send_message(TELEGRAM_CHAT_ID, text=message)
         logging.info(SEND_MESSAGE_INFO_LOG.format(message))
     except telegram.TelegramError as telegram_error:
         logging.exception(SEND_MESSAGE_EXCEPTION_LOG(message, telegram_error))
+        success = False
+    return success
 
 
 def get_api_answer(current_timestamp):
@@ -130,25 +133,27 @@ def main():
     if not check_tokens():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time()) - 100000
+    last_timestamp = 0
     last_message = ''
     while True:
         try:
-            response = get_api_answer(current_timestamp)
+            response = get_api_answer(last_timestamp)
             homeworks = check_response(response)
             if homeworks:
                 message = parse_status(homeworks[0])
                 send_message(bot, message)
+            if send_message:
+                last_timestamp = response.get(
+                    'current_date', last_timestamp)
             else:
                 logging.debug(NO_NEW_STATUS_IN_API)
-            current_timestamp = response.get(
-                'current_date', current_timestamp)
         except Exception as error:
             message = MAIN_EXCEPTION_MESSAGE.format(error)
             logging.error(message)
             if message != last_message:
                 send_message(bot, message)
-            last_message = message
+            if send_message:
+                last_message = message
         finally:
             time.sleep(RETRY_TIME)
 
