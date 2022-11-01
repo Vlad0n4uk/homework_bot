@@ -133,27 +133,25 @@ def main():
     if not check_tokens():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    last_timestamp = 0
+    timestamp = 0
     last_message = ''
     while True:
         try:
-            response = get_api_answer(last_timestamp)
+            response = get_api_answer(timestamp)
             homeworks = check_response(response)
             if homeworks:
                 message = parse_status(homeworks[0])
-                send_message(bot, message)
-            if send_message:
-                last_timestamp = response.get(
-                    'current_date', last_timestamp)
+                if send_message(bot, message):
+                    timestamp = response.get(
+                        'current_date', timestamp)
             else:
                 logging.debug(NO_NEW_STATUS_IN_API)
         except Exception as error:
             message = MAIN_EXCEPTION_MESSAGE.format(error)
             logging.error(message)
             if message != last_message:
-                send_message(bot, message)
-            if send_message:
-                last_message = message
+                if send_message(bot, message):
+                    last_message = message
         finally:
             time.sleep(RETRY_TIME)
 
